@@ -17,25 +17,20 @@ parser.add_argument('--lgi', type=str,
 """
 Tested only with python3.6
 """
-#TODO command line
-DIR_PATH = '/home/lucasf/data/save_res_lgi_v2/UZL00175_Study1/'
-CGM_PATH = os.path.join(DIR_PATH, 'cgm_left.vtk')
-LGI_PATH = os.path.join(DIR_PATH, 'cgm_left.lgi.map.20.txt')
 
-
-def main():
+def main(cgm_path, lgi_path):
 
     # Load the mesh
     reader = vtk.vtkPolyDataReader()
-    print('Load %s' % CGM_PATH)
-    reader.SetFileName(CGM_PATH)
+    print('Load %s' % cgm_path)
+    reader.SetFileName(cgm_path)
     reader.Update()
     mesh = reader.GetOutput()
     nb_points = mesh.GetNumberOfPoints()
     print('The mesh has %d points' % nb_points)
 
     # Read the LGI
-    lgi_np = load_lgi(LGI_PATH)
+    lgi_np = load_lgi(lgi_path)
     min_lgi = np.nanmin(lgi_np)
     max_lgi = np.nanmax(lgi_np)
     mean_lgi = np.nanmean(lgi_np)
@@ -81,5 +76,7 @@ def main():
     window.Render()
     interactor.Start()
 
+
 if __name__ == '__main__':
-    main()
+    args = parser.parse_args()
+    main(cgm_path=args.cgm, lgi_path=args.lgi)
