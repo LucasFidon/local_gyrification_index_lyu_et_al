@@ -5,11 +5,9 @@ This script is for converting the segmentations from nifti to vtk format.
 import os
 import nibabel as nib
 import vtk  # should be version 8.1.2
-from scipy.ndimage.measurements import label
 import numpy as np
 
 # TESTED ONLY WITH PYTHON 3.6
-
 ROI = {'wm': 1, 'cgm': 5, 'cc': 8}
 
 
@@ -44,27 +42,11 @@ def nii2vtk(binary_mask_nii_path, save_path):
     writer.Write()
 
 
-def find_where_to_split(wm_mask):
-    # Find the two largest connected components
-    structure = np.ones((3, 3, 3), dtype=np.int)
-    labeled, ncomp = label(wm_mask, structure)
-    size_comp = [
-        np.sum(labeled == l) for l in range(1, ncomp + 1)
-    ]
-    first_largest_comp = np.argmax(size_comp)
-    label_first = first_largest_comp + 1
-    size_comp[first_largest_comp] = -1
-    second_largest_comp = np.argmax(size_comp)
-    label_second = second_largest_comp + 1
-
-    x_1, _, _ = np.where(labeled == label_first)
-    x_2, _, _ = np.where(labeled == label_second)
-    if np.mean(x_1) > np.mean(x_2):
-        x_split = 0.5 * (np.min(x_1) + np.max(x_2))
-    else:
-        x_split = 0.5 * (np.max(x_1) + np.min(x_2))
-    return round(x_split)
-
+def find_where_to_split(cc_mask):
+    # We define the plane between right and left as the middle of the CC
+    x, _, _ = np.where(cc_mask == 1)
+    x_split = round(np.median(x))
+    return x_split
 
 # MAIN function
 def convert_nii_to_vtk(niftiImagePath, saveFolder):
@@ -85,7 +67,7 @@ def convert_nii_to_vtk(niftiImagePath, saveFolder):
     wm = (seg_array ==  ROI['wm']).copy()
     cgm = (seg_array ==  ROI['cgm']).copy()
     cc = (seg_array == ROI['cc']).copy()
-    x_split = find_where_to_split(wm)
+    x_split = find_where_to_split(cc)
     wm = np.logical_or(wm, cc)
 
     # Left side
