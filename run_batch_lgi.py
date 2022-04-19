@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 KERNEL_VALUE = 108  # default: 316; and for neonats they have used 108 in the paper
-# THRES_OUTLIERS = 25  # threshold used to compute the mean
+THRES_OUTLIERS = 10  # threshold used to compute the mean
 SAVE_FOLDER = '/home/lucasf/data/save_res_lgi_v2'  # where all the output will be saved
 CSV_RESULTS = os.path.join(SAVE_FOLDER, 'lgi.csv')
 COLUMNS = [
@@ -39,9 +39,9 @@ CONTROLS_DOAA = os.path.join(BASE_FOLDER_DATA, 'SRR_and_Seg_Michael_cases_group'
 CONTROLS_EXT_CSF = os.path.join(BASE_FOLDER_DATA, 'SRR_and_Seg_Nada_cases_group', 'Controls_with_extcsf_MA')  # 26
 CONTROLS_KCL = os.path.join(BASE_FOLDER_DATA, 'SRR_and_Seg_KCL', 'Control')  # 29
 CONTROL_FOLDERS = [
-    # CONTROLS_2,
+    CONTROLS_2,
     CONTROLS_DOAA,
-    # CONTROLS_EXT_CSF,
+    CONTROLS_EXT_CSF,
     CONTROLS_KCL,
 ]
 # TEST FOLDER
@@ -68,7 +68,7 @@ for f in os.listdir(TEST_FOLDER):  # Only for debugging
         CASES['Test'].append(path)
 
 #TODO
-CASES['Control'] = CASES['Control'][:14]
+#CASES['Control'] = CASES['Control'][:14]
 
 
 def load_csv_results():
@@ -100,7 +100,7 @@ def update_csv(pat_id, condition, lgi_left, lgi_right):
     lgi_left = lgi_left[np.logical_not(np.isnan(lgi_left))]
     lgi_right = lgi_right[np.logical_not(np.isnan(lgi_right))]
 
-    mean_l = np.mean(lgi_left)
+    mean_l = np.mean(lgi_left[lgi_left < THRES_OUTLIERS])
     median_l = np.median(lgi_left)
     p5_l = np.percentile(lgi_left, 5)
     p25_l = np.percentile(lgi_left, 25)
@@ -108,7 +108,7 @@ def update_csv(pat_id, condition, lgi_left, lgi_right):
     p95_l = np.percentile(lgi_left, 95)
     IQR_l = p75_l - p25_l
 
-    mean_r = np.mean(lgi_right)
+    mean_r = np.mean(lgi_right[lgi_right < THRES_OUTLIERS])
     median_r = np.median(lgi_right)
     p5_r = np.percentile(lgi_right, 5)
     p25_r = np.percentile(lgi_right, 25)
@@ -156,8 +156,6 @@ def load_lgi(lgi_txt):
     lgi = [float(v.replace('\n', '')) for v in vals]
     lgi_np = np.array(lgi)
     lgi_np[lgi_np == np.inf] = np.nan
-    # Exclude values that are abnormally high
-    # lgi_np[lgi_np > THRES_OUTLIERS] = np.nan
     return lgi_np
 
 
@@ -229,4 +227,4 @@ if __name__ == '__main__':
         os.mkdir(SAVE_FOLDER)
     # main('Test')
     main('Control')
-    # main('CDH')
+    main('CDH')
