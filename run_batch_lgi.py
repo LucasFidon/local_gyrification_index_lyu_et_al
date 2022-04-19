@@ -3,10 +3,20 @@ import csv
 import numpy as np
 import pandas as pd
 
-THRES_OUTLIERS = 25  # threshold used to compute the mean
-SAVE_FOLDER = '/home/lucasf/data/save_res_lgi'  # where all the output will be saved
+KERNEL_VALUE = 108  # default: 316; and for neonats they have used 108 in the paper
+# THRES_OUTLIERS = 25  # threshold used to compute the mean
+SAVE_FOLDER = '/home/lucasf/data/save_res_lgi_v2'  # where all the output will be saved
 CSV_RESULTS = os.path.join(SAVE_FOLDER, 'lgi.csv')
-COLUMNS = ['Patient ID', 'Condition', 'Mean LGI left hemisphere', 'Mean LGI right hemisphere', 'Mean LGI whole brain']
+COLUMNS = [
+    'Patient ID', 'Condition',
+    'Mean LGI left hemisphere', 'Mean LGI right hemisphere',
+    'Median LGI left hemisphere', 'Median LGI right hemisphere',
+    'p5 LGI left hemisphere', 'p5 LGI right hemisphere',
+    'p25 LGI left hemisphere', 'p25 LGI right hemisphere',
+    'p75 LGI left hemisphere', 'p75 LGI right hemisphere',
+    'p95 LGI left hemisphere', 'p95 LGI right hemisphere',
+    'IQR LGI left hemisphere', 'IQR LGI right hemisphere',
+]
 
 REPO_PATH = '/home/lucasf/workspace/local_gyrification_index_lyu_et_al'
 BASE_FOLDER_DATA = '/home/lucasf/data/Fetal_SRR_and_Seg/'
@@ -29,9 +39,9 @@ CONTROLS_DOAA = os.path.join(BASE_FOLDER_DATA, 'SRR_and_Seg_Michael_cases_group'
 CONTROLS_EXT_CSF = os.path.join(BASE_FOLDER_DATA, 'SRR_and_Seg_Nada_cases_group', 'Controls_with_extcsf_MA')  # 26
 CONTROLS_KCL = os.path.join(BASE_FOLDER_DATA, 'SRR_and_Seg_KCL', 'Control')  # 29
 CONTROL_FOLDERS = [
-    CONTROLS_2,
+    # CONTROLS_2,
     CONTROLS_DOAA,
-    CONTROLS_EXT_CSF,
+    # CONTROLS_EXT_CSF,
     CONTROLS_KCL,
 ]
 # TEST FOLDER
@@ -57,6 +67,9 @@ for f in os.listdir(TEST_FOLDER):  # Only for debugging
         path = os.path.join(TEST_FOLDER, f)
         CASES['Test'].append(path)
 
+#TODO
+CASES['Control'] = CASES['Control'][:14]
+
 
 def load_csv_results():
     if not os.path.exists(CSV_RESULTS):
@@ -64,6 +77,7 @@ def load_csv_results():
         return None
     data = pd.read_csv(CSV_RESULTS)
     return data
+
 
 def was_lgi_already_evaluated(pat_id):
     data = load_csv_results()
@@ -74,16 +88,51 @@ def was_lgi_already_evaluated(pat_id):
         return False
     return True
 
-def update_csv(pat_id, condition, mean_lgi_left, mean_lgi_right):
+
+def update_csv(pat_id, condition, lgi_left, lgi_right):
     """
     Add a new row to the CSV file.
     The rows are reordered in patient ID alphabetical order.
     :param pat_id: patient ID
-    :param mean_lgi_left: mean LGI value for the left hemisphere
-    :param mean_lgi_right: mean LGI value for the right hemisphere
+    :param lgi_left: LGI values for the left hemisphere
+    :param lgi_right: LGI values for the right hemisphere
     """
-    mean_lgi_global = 0.5 * (mean_lgi_left + mean_lgi_right)
-    row = [pat_id, condition, round(mean_lgi_left, 4), round(mean_lgi_right, 4), round(mean_lgi_global, 4)]
+    lgi_left = lgi_left[np.logical_not(np.isnan(lgi_left))]
+    lgi_right = lgi_right[np.logical_not(np.isnan(lgi_right))]
+
+    mean_l = np.mean(lgi_left)
+    median_l = np.median(lgi_left)
+    p5_l = np.percentile(lgi_left, 5)
+    p25_l = np.percentile(lgi_left, 25)
+    p75_l = np.percentile(lgi_left, 75)
+    p95_l = np.percentile(lgi_left, 95)
+    IQR_l = p75_l - p25_l
+
+    mean_r = np.mean(lgi_right)
+    median_r = np.median(lgi_right)
+    p5_r = np.percentile(lgi_right, 5)
+    p25_r = np.percentile(lgi_right, 25)
+    p75_r = np.percentile(lgi_right, 75)
+    p95_r = np.percentile(lgi_right, 95)
+    IQR_r = p75_r - p25_r
+
+    row = [
+        pat_id, condition,
+        mean_l, mean_r,
+        median_l, median_r,
+        p5_l, p5_r,
+        p25_l, p25_r,
+        p75_l, p75_r,
+        p95_l, p95_r,
+        IQR_l, IQR_r,
+    ]
+
+    print('\033[92m')
+    print(COLUMNS)
+    print(row)
+    print('\033[0m')
+
+    # Write the new row
     if not os.path.exists(CSV_RESULTS):
         print('Create %s' % CSV_RESULTS)
         with open(CSV_RESULTS, 'w') as f:
@@ -94,10 +143,12 @@ def update_csv(pat_id, condition, mean_lgi_left, mean_lgi_right):
         with open(CSV_RESULTS, 'a') as f:
             writer = csv.writer(f)
             writer.writerow(row)
+
     # Reorder the rows in ID alphabetical order
     data = load_csv_results()
     df = data.sort_values(by=['Patient ID'], ignore_index=True)
     df.to_csv(CSV_RESULTS, index=False)
+
 
 def load_lgi(lgi_txt):
     with open(lgi_txt, 'r') as f:
@@ -106,11 +157,11 @@ def load_lgi(lgi_txt):
     lgi_np = np.array(lgi)
     lgi_np[lgi_np == np.inf] = np.nan
     # Exclude values that are abnormally high
-    lgi_np[lgi_np > THRES_OUTLIERS] = np.nan
+    # lgi_np[lgi_np > THRES_OUTLIERS] = np.nan
     return lgi_np
 
-def main(condition):
 
+def main(condition):
     for folder_path in CASES[condition]:
         pat_id = os.path.split(folder_path)[1]
 
@@ -134,7 +185,7 @@ def main(condition):
             os.system(cmd)
 
         # Compute the LGI values for right and left hemispheres
-        mean_lgi_dict = {}
+        lgi_dict = {}
         for side in ['left', 'right']:
             print('\033[92m%s hemisphere\033[0m' % side)
 
@@ -154,7 +205,7 @@ def main(condition):
                 # compute it using the method of Lyu et al.
                 cmd_base = 'docker run -v %s:/INPUT/ --rm ilwoolyu/cmorph:1.7 lgi' % save_folder
                 cmd_paths = '-i /INPUT/cgm_%s.vtk --white /INPUT/wm_%s.vtk --out /INPUT/' % (side, side)
-                cmd_options = '--kernel 108'  # default: 316; and for neonats they have used 108
+                cmd_options = '--kernel %d' % KERNEL_VALUE
                 cmd = '%s %s %s' % (cmd_base, cmd_paths, cmd_options)
                 os.system(cmd)
 
@@ -167,15 +218,10 @@ def main(condition):
                 print(lgi_txt)
 
             # Load the LGI file
-            lgi_np = load_lgi(lgi_txt)
-            min_lgi = np.nanmin(lgi_np)
-            max_lgi = np.nanmax(lgi_np)
-            mean_lgi = np.nanmean(lgi_np)
-            print('LGI values range: [%f, %f], mean LGI value: %f\n' % (min_lgi, max_lgi, mean_lgi))
-            mean_lgi_dict[side] = mean_lgi
+            lgi_dict[side] = load_lgi(lgi_txt)
 
         # Add values to the csv
-        update_csv(pat_id, condition, mean_lgi_dict['left'], mean_lgi_dict['right'])
+        update_csv(pat_id, condition, lgi_dict['left'], lgi_dict['right'])
 
 
 if __name__ == '__main__':
@@ -183,4 +229,4 @@ if __name__ == '__main__':
         os.mkdir(SAVE_FOLDER)
     # main('Test')
     main('Control')
-    main('CDH')
+    # main('CDH')
